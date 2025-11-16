@@ -1,0 +1,5 @@
+selenium>=4.15.0
+beautifulsoup4
+markdownify
+requests
+toollib

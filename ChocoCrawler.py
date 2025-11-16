@@ -15,11 +15,11 @@ def filename_filter(filename):
 
 if __name__ == '__main__':
     # 指定chromedriver.exe路径
-    driver_path = "chromedriver.exe"
+    driver_path = "G:\\SecTools\\Crawler\\chromedriver\\chromedriver.exe"
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument('--ignore-certificate-errors')
     driver = webdriver.Chrome(service=Service(driver_path),options=chrome_options)
-    for i in range(15079, 20000):#id为文章编号 看先知平台
+    for i in range(10320, 15000):#id为文章编号 看先知平台
         try:
             id = str(i)
             url = "https://xz.aliyun.com/news/" + id
@@ -46,14 +46,14 @@ if __name__ == '__main__':
             print(f"URL: {url}, Title: {title_text}")
             
             if not title_text or ('400 -' in title_text) :
-                time.sleep(10)
+                time.sleep(1)
                 continue
                 
             f = filename_filter(title_text)
-            filename = "./xianzhi/"+id+"-"+ f + ".md"
+            filename = "E:/Download/xianzhi/"+id+"-"+ f + ".md"
 
-            if not os.path.exists("./xianzhi/images"):
-                os.makedirs("./xianzhi/images")
+            if not os.path.exists("E:/Download/xianzhi/images"):
+                os.makedirs("E:/Download/xianzhi/images")       
             
             # 更精确地获取文章内容，而不是整个页面
             article_content = None
@@ -82,7 +82,7 @@ if __name__ == '__main__':
             # 下载文章图片
             for img_tag in article_img_tags:
                 try:
-                    img_url = img_tag.get("src")
+                    img_url = img_tag.get("src", "").strip()
                     if img_url:
                         # 处理相对路径
                         if not img_url.startswith(('http://', 'https://')):
@@ -93,7 +93,7 @@ if __name__ == '__main__':
                         img_name = f"{id}_{img_name}"
                         
                         img_data = requests.get(img_url, headers=headers, timeout=10).content
-                        with open(f"./xianzhi/images/{img_name}", "wb") as img_file:
+                        with open(f"E:/Download/xianzhi/images/{img_name}", "wb") as img_file:
                             img_file.write(img_data)
                 except Exception as img_e:
                     print(f"下载图片失败: {str(img_e)}")
@@ -127,5 +127,5 @@ if __name__ == '__main__':
         except Exception as e:
             print(str(e))
             pass
-        time.sleep(5)
+        time.sleep(1)
     driver.quit()
