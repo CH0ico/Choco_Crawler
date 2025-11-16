@@ -1,131 +1,172 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+先知道（xz.aliyun.com）文章批量爬 → Markdown + 本地图片
+并发加速版（线程池 + 每线程独立driver），可 Ctrl-C 安全退出
+"""
+
+import os
 import time
+import random
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from toollib import autodriver
-import markdownify
 from bs4 import BeautifulSoup
-import os
-import requests
+import markdownify
 
-def filename_filter(filename):  
-    string1="\/:*?\"<>|"
-    for s1 in string1:
-        filename= filename.replace(s1," ")
-    return(filename)
+# -------------------- 全局锁 / 会话 --------------------
+print_lock = threading.Lock()
+file_lock  = threading.Lock()
 
-if __name__ == '__main__':
-    # 指定chromedriver.exe路径
-    driver_path = "G:\\SecTools\\Crawler\\chromedriver\\chromedriver.exe"
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--ignore-certificate-errors')
-    driver = webdriver.Chrome(service=Service(driver_path),options=chrome_options)
-    for i in range(10320, 15000):#id为文章编号 看先知平台
-        try:
-            id = str(i)
-            url = "https://xz.aliyun.com/news/" + id
+sess = requests.Session()
+retries = Retry(total=3, backoff_factor=0.3, status_forcelist=[500, 502, 503, 504])
+sess.mount("http://",  HTTPAdapter(max_retries=retries))
+sess.mount("https://", HTTPAdapter(max_retries=retries))
+
+# -------------------- 线程局部存储：每个线程独享一个 driver
+thread_local = threading.local()
+
+CREATE_DRIVER_COOLDOWN = 4      # 秒，可自行微调
+
+def get_driver():
+    """返回当前线程的独立浏览器实例（带创建冷却）"""
+    if not hasattr(thread_local, "driver"):
+        driver_path = r"G:\SecTools\Crawler\chromedriver\chromedriver.exe"
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument("--ignore-certificate-errors")
+        # 如要无头，再加 chrome_options.add_argument("--headless=new")
+        thread_local.driver = webdriver.Chrome(
+            service=Service(driver_path), options=chrome_options
+        )
+        # ===== 关键：创建后先睡 =====
+        time.sleep(CREATE_DRIVER_COOLDOWN)
+    return thread_local.driver
+
+# -------------------- 工具函数 --------------------
+def filename_filter(filename: str) -> str:
+    for ch in r'\/:*?"<>|':
+        filename = filename.replace(ch, " ")
+    return filename
+
+# -------------------- 单个任务 --------------------
+def crawl_one(i: int) -> str:
+    """单篇文章抓取"""
+    try:
+        id_ = str(i)
+        url = f"https://xz.aliyun.com/news/{id_}"
+
+        # 1. 先拿到 driver（已内置冷却）
+        driver = get_driver()
+
+        # 2. 访问前再 human-like 随机睡 0~2 秒
+        time.sleep(random.uniform(0, 2))
+
+        with print_lock:
             print(url)
+        driver.get(url)
+        headers = {
+            "Referer": "https://xz.aliyun.com/",
+            # 下面 Cookie 请换成自己有效 Cookie，太长已折叠
+            "Cookie": "customer_timezone=8; arms_uid=de74db3f-a544-4abf-9709-11b8479fbca4; ..."
+        }
 
-            driver.get(url)
-            headers = {
-                "Referer": "https://xz.aliyun.com/",
-                #"Cookie": "customer_timezone=8; arms_uid=de74db3f-a544-4abf-9709-11b8479fbca4; cna=FDKgIX46lFYBASABAlDqT4dh; account_info_switch=close; login_aliyunid_ticket=mBZHIzsgdZq64XXWQgyKFeuf0vpmV*s*CT58JlM_1t$w3AC$WOXI4tViI*9_87vjMLTWF*HtHfFI1p9puQFfgaJ_gPpof_BNTwUhTOoNC1ZBeeMfKJzxdnb95hYssNIZor6q7SCxRtgmGCbifG2Cd4aW0; login_aliyunid_csrf=_csrf_tk_1560863264167977; login_aliyunid_pk=1014399768132748; login_current_pk=1014399768132748; hssid=F1B4CD06C19CE93219151232E3AEF5A7; hsite=6; aliyun_country=CN; aliyun_site=CN; aliyun_lang=zh; tfstk=gfzIm_c9upvBvaqxA45wco6YMb35317q9QG8i7Lew23Lw4N8ZYkE4YrsPR2BTHPzwYw7QA2PtbS3V4wTQkkLU2J5PRMizvzUYuZ_KSnUF7fnwYe8FYrFbZP3t40R3Y_VuW0k5adYR4pz62cPuFWT0ZP3tC3R3t7Vua_Ul9H-e8nKXhhqBXp8e0hO1bhyp3LLe5CsIb--eeH-WAhoNY3-y8FO1bDte4n8e5CsZAH-K5AjNMM3Os4eNCgexZNICUL85XBoHWMssf4sODMxXAT8OPGIAxFLkHs_vfUa5mowai0TilyK1q_wvqF_2-ZYEi-iR7ELEcwhIhMaXyV-ecRJu5Nb9o3Tz_dmfRhSD4n6wUFs-AnzJqQvCfqTTuU3dQT-tyzqVxm1wUmrWroYDJOli53Kw8m0ztYnp7F0oouf7H3Y1uebVg8Xux_ic3OsmUhs3116q3AAfPkXIgIiPDhiOc511pEovfcs3116q3mKsXMN119Lq; login_aliyunid_pks=BG+k67ShqqisbhQyl121+tTy7utfbBknZHVZUiqweSXCvM=; login_aliyunid=CH****; remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d=eyJpdiI6InY4MHVBcFhOZkxneGFrMVlGQi9md0E9PSIsInZhbHVlIjoiYWRwS29NOUZ3TUkzSnpINGRqWFRRU1BpUUFyeGVGSTdDU3FDSGJYUjFGZzJtOU1LYTF0bC9ibnh2eUE1dUJnNDg3dXBlbi90c2I1VWNRNWZnQllSUWRkenk4RUFidk5hV1FnYXZqaGRNVUorZExQVFJ6QUxRS2dmd0YzUGN3QWRQQVBYTncxVHpUOXFsNyt4YXNtT2VRPT0iLCJtYWMiOiJkMDg0NTMzODJjNmE4NmQ5OWNjOGU1NzcxZDcxOGU5N2QyMWY0YjgwMDliMjVlYzdmNjhlZDMzMDE3ODk0NjBjIiwidGFnIjoiIn0%3D; acw_tc=1a0c380917632664735507748e3432645ef2d7070851d01c0ac6926aaec9f9; XSRF-TOKEN=eyJpdiI6IjU4Q2tFUUtvOC9BVWtIU2dHaHA0T1E9PSIsInZhbHVlIjoiTktkeE5UTjFaemRSajVGanJIczI2OHZNUmJyMGUrMGVqcFhadEQrWHZ1T2JkdUd3MEU3VTFFVk00cGxWRDl6SVVrdUlJeGQ4eHYva3d4WUd5NFl4aE80ZDUvT3FtaGR4L0FzOFdpcGd1Qi9CUUZwbkNSWGY0QXU2RnpPU2IrREkiLCJtYWMiOiJkOTcxMDAyNGZjOTFhYzdiZmE3MWVlZTBlM2FmZGI5MDg4NmUyODhjYmQ2ODM1Zjk1ZTUzNjQ1MGRmODIwNWQ0IiwidGFnIjoiIn0%3D; plus_session=eyJpdiI6InNrVG5iM1B5RFhhbFJ5YWtHZkdzS2c9PSIsInZhbHVlIjoiVE5BcE1Ha3ZYSHp1d3loeHlPWGcyNUtGOXR3cG1wMmQ3VjB4SUJzZ29paWlwUWNEcmtMUU1wYWFwLy9rZFo3dW9BVnlZNkNndElYTXd4WEdZQURURHBuQmFHSmU2Q2VlYnJSVEtxaGRWUnVRVCs0OVl5Qmx3UTFmZTJEajUxR0giLCJtYWMiOiJlNTY3Nzk2Njk0M2VjNTg4MzNkOTRhNWI5ODc0MTAyYWVjMWFiODEyZGVkNzNlZmI2NjZjNjIwZTIzZmRjZmE1IiwidGFnIjoiIn0%3D; SERVERID=6ca2b1097a25813135a2db094b58bc2d|1763266688|1763262730; ssxmod_itna=1-YuD=q_OGCGOKG=G0idoD5Ee_DcDUED0dGMD3qiQGgDYq7=GFKDCEOKEGaegqSx4BvNDGEu01qUjqDszexiNDAxq0iDCbej4Ht_D42tzinC0vPY96700Iqg9QWvpP8n7ok9aFy/6/lqsBUpY7YYf2vtKAwKFAiPPODrDB3DbqDyz75YexGGj4GwDGoD34DiDDPLD03Db4D_7pTD7Enas=9bVneDQ4GyDitDKumbxi3DA4Dj36h45fnipDDBDGUzptHDG4Gfi1YD0kY25brYK4GW3ca3VcmGEUxHrDhbx0taDBLt0VOEusVhidHPXg1UplEzcdDCKD7w7jRbxkKARF0_TvqbP7iwBYoreRxx=DxH7xPDii7eaAqd7xi0DdBq_GreEifoQMie1ov_YkM7YAhw_ADzreYChtjWiW__io=itCiiwgY=BqrAYiB4IrAMA5VDYdYrGBwjepa=rMmx4D; ssxmod_itna2=1-YuD=q_OGCGOKG=G0idoD5Ee_DcDUED0dGMD3qiQGgDYq7=GFKDCEOKEGaegqSx4BvNDGEu01qUY4DW_SnrWhdYDjbwdP8i12_ddD05jf0n9ATBfaXCI5chFrl6rxL0VIp85LqpN/u/XGG3RQ_3CtM6f/B_XiB6R_T0xj8GXIjf5jn=L3A2=MrT2jwtruWdRDl_xdLbZm2fuIjWY4PT/t1RK_T9CkBdHELx/eeKZRnawwwnx4oXhSeHD5quNfc3KsTjoHYenKn2yGAdXPu5q5fbrPMwP93UeE3LBi6fqlI8XsMEXRIgfGB4lxKno74Wi6THhra6r7ArNYiaoWQNQH4WaKTGTw3qDezSa=DQarsGokdA3qD1lMk2LbwoH28iKLbmbiOba_2F=SWBi8U4_bTFzDi6TQPltsMrl2aVEhewEqkirmNVxKcWEqfIakO9x7F2Hv_tH0HXg=CnH_SrQSaxd1axh/brzapTQzXMkGlCGr1YDbzdH6=zFhFseFzLQvO6RZaKMjarIK9t_8b170T8bOgzQ=mK44Ne4y8THrt2ntyehlhWt4iEtvjIb56fX/WKqI_fDaTw_zQpE8MmTw/w6Cig4x_Dd=D4MB=bxhLri5vFYAzzg8WI3HYSXE5pa7UpRQbSWOMkjMK_5_ie5rZrO5ZB5DOx1GwsYZcsDMYZ4D; acw_sc__v2=197d84838-b6d9d7ce0be61d80cc98c8aa91537c3b12f60bee2c58277f68"  # 替换为实际cookie
-            }
+        soup = BeautifulSoup(driver.page_source, "html.parser")
 
-            html_content = driver.page_source
-            soup = BeautifulSoup(html_content, "html.parser")
-            
-            # 尝试多种方式获取文章标题
-            title_tag = soup.find('title')
-            title_text = title_tag.text if title_tag else None
-            
-            # 也尝试从文章内容中获取标题
-            article_title = soup.find('h1', class_='article-title')
-            if article_title:
-                title_text = article_title.text.strip()
-                
-            print(f"URL: {url}, Title: {title_text}")
-            
-            if not title_text or ('400 -' in title_text) :
-                time.sleep(1)
-                continue
-                
-            f = filename_filter(title_text)
-            filename = "E:/Download/xianzhi/"+id+"-"+ f + ".md"
+        # 1. 标题
+        title_tag = soup.find("title")
+        title_text = title_tag.text if title_tag else None
+        article_title = soup.find("h1", class_="article-title")
+        if article_title:
+            title_text = article_title.text.strip()
 
-            if not os.path.exists("E:/Download/xianzhi/images"):
-                os.makedirs("E:/Download/xianzhi/images")       
-            
-            # 更精确地获取文章内容，而不是整个页面
-            article_content = None
-            
-            # 尝试常见的文章内容容器
-            article_containers = [
-                soup.find('div', class_='article-content'),
-                soup.find('div', class_='content'),
-                soup.find('article'),
-                soup.find('div', id='content'),
-                soup.find('div', class_='article-body')
-            ]
-            
-            for container in article_containers:
-                if container:
-                    article_content = container
-                    break
-            
-            # 如果找不到具体的文章容器，就使用整个页面
-            if not article_content:
-                article_content = soup.body if soup.body else soup
-            
-            # 提取文章内容中的图片
-            article_img_tags = article_content.find_all("img")
-            
-            # 下载文章图片
-            for img_tag in article_img_tags:
-                try:
-                    img_url = img_tag.get("src", "").strip()
-                    if img_url:
-                        # 处理相对路径
-                        if not img_url.startswith(('http://', 'https://')):
-                            img_url = "https://xz.aliyun.com" + img_url
-                        
-                        img_name = os.path.basename(img_url)
-                        # 添加ID前缀避免文件名冲突
-                        img_name = f"{id}_{img_name}"
-                        
-                        img_data = requests.get(img_url, headers=headers, timeout=10).content
-                        with open(f"E:/Download/xianzhi/images/{img_name}", "wb") as img_file:
-                            img_file.write(img_data)
-                except Exception as img_e:
-                    print(f"下载图片失败: {str(img_e)}")
-            
-            # 将文章内容转换为Markdown
-            article_html = str(article_content)
-            md_content = markdownify.markdownify(article_html, heading_style="ATX")
-            
-            # 修改Markdown中的图片引用路径
-            for img_tag in article_img_tags:
-                try:
-                    img_url = img_tag.get("src")
-                    if img_url:
-                        if not img_url.startswith(('http://', 'https://')):
-                            img_url = "https://xz.aliyun.com" + img_url
-                        
-                        original_img_name = os.path.basename(img_url)
-                        new_img_name = f"{id}_{original_img_name}"
-                        md_content = md_content.replace(img_url, f"images/{new_img_name}")
-                except Exception as img_e:
-                    print(f"修改图片路径失败: {str(img_e)}")
-            
-            # 添加一些元信息
-            md_content = f"# {title_text}\n\n来源: {url}\n\n{md_content}"
-            
-            # 保存Markdown文件
-            with open(filename, "w", encoding="utf-8") as md_file:
-                md_file.write(md_content)
-                
-            print(f"成功保存: {filename}")
-        except Exception as e:
-            print(str(e))
-            pass
-        time.sleep(1)
-    driver.quit()
+        if not title_text or "400 -" in title_text:
+            return f"{id_} 跳过（无标题或404）"
+
+        # 2. 文件名、目录
+        f_name = filename_filter(title_text)
+        md_path = f"G:/exps/xianzhi/{id_}-{f_name}.md"
+        with file_lock:
+            os.makedirs("G:/exps/xianzhi/images", exist_ok=True)
+
+        # 3. 找正文容器
+        article_content = None
+        for container in [
+            soup.find("div", class_="article-content"),
+            soup.find("div", class_="content"),
+            soup.find("article"),
+            soup.find("div", id="content"),
+            soup.find("div", class_="article-body"),
+        ]:
+            if container:
+                article_content = container
+                break
+        if not article_content:
+            article_content = soup.body or soup
+
+        # 4. 下载图片
+        img_tags = article_content.find_all("img")
+        for img in img_tags:
+            try:
+                img_url = img.get("src", "").strip()
+                if not img_url:
+                    continue
+                if not img_url.startswith(("http://", "https://")):
+                    img_url = "https://xz.aliyun.com" + img_url
+                img_name = f"{id_}_{os.path.basename(img_url)}"
+                img_data = sess.get(img_url, headers=headers, timeout=10).content
+                with open(f"G:/exps/xianzhi/images/{img_name}", "wb") as f_img:
+                    f_img.write(img_data)
+            except Exception as img_e:
+                with print_lock:
+                    print(f"{id_} 下载图片失败: {img_e}")
+
+        # 5. 转 Markdown + 替换图片路径
+        md_content = markdownify.markdownify(str(article_content), heading_style="ATX")
+        for img in img_tags:
+            try:
+                img_url = img.get("src", "")
+                if not img_url:
+                    continue
+                if not img_url.startswith(("http://", "https://")):
+                    img_url = "https://xz.aliyun.com" + img_url
+                new_name = f"{id_}_{os.path.basename(img_url)}"
+                md_content = md_content.replace(img_url, f"images/{new_name}")
+            except Exception as img_e:
+                with print_lock:
+                    print(f"{id_} 替换图片路径失败: {img_e}")
+
+        # 6. 写文件
+        md_full = f"# {title_text}\n\n来源: {url}\n\n{md_content}"
+        with file_lock:
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md_full)
+        return f"{id_} 成功 -> {md_path}"
+
+    except Exception as e:
+        return f"{i} 异常: {e}"
+    finally:
+        time.sleep(1)   # 保持原有节奏，防止瞬间过高并发
+
+# -------------------- 主入口 --------------------
+if __name__ == "__main__":
+    try:
+        workers = 8
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(crawl_one, i) for i in range(10404, 15000)]
+            for fu in as_completed(futures):
+                with print_lock:
+                    print(fu.result())
+    except KeyboardInterrupt:
+        with print_lock:
+            print("\n收到 Ctrl-C，正在终止任务……")
+        pool.shutdown(wait=False)   # 立即停掉线程池
+    finally:
+        # 关闭所有线程里的浏览器
+        if hasattr(thread_local, "driver"):
+            thread_local.driver.quit()
