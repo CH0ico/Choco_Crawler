@@ -15,13 +15,17 @@
 
 ## 目录结构（推荐）
 
-ChocoCrawler-XZ/
+```
+ChocoCrawler/
 ├─ ChocoCrawler.py   # 主爬虫脚本
 ├─ clean.py          # 清洗冗余头尾
 ├─ chromedriver.exe  # Chrome 驱动（需自己下载并放于此）
 ├─ README.md         # 本文档
 └─ xianzhi/          # 运行后自动生成
    ├─ images/        # 文章配图
+```
+
+
 
 ## 快速开始
 
