@@ -23,6 +23,7 @@ ChocoCrawler/
 ├─ README.md         # 本文档
 └─ xianzhi/          # 运行后自动生成
    ├─ images/        # 文章配图
+   ├─ *.md
 ```
 
 
