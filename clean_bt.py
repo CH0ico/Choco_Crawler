@@ -11,7 +11,7 @@ import re
 import glob
 
 # 全局配置 - 方便修改管理
-BUTIAN_DIR = 'G:/exps/butian'  # 补天社区文件目录（使用正斜杠避免转义问题）
+BUTIAN_DIR = 'G:/Exps/BuTian/share'  # 补天社区文件目录（使用正斜杠避免转义问题）
 
 def main():
     """主函数：批量删除包含404的失效文件"""

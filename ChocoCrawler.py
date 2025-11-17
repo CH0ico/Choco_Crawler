@@ -23,16 +23,21 @@ import markdownify
 # -------------------- 配置全局变量 --------------------
 # 网站配置
 BASE_URL = "https://forum.butian.net"
-ARTICLE_URL_TEMPLATE = f"{BASE_URL}/article/{{}}"
+
+# 文章URL模板（注意：id 是字符串） 
+# butian.net/share
+# butian.net/article
+# xz.aliyun.com/news
+ARTICLE_URL_TEMPLATE = f"{BASE_URL}/share/{{}}" 
 
 # 爬取配置(id范围)
-START_ID = 1
-END_ID = 750
+START_ID = 501
+END_ID = 4648
 CREATE_DRIVER_COOLDOWN = 6      # 创建浏览器实例的时间间隔，可自行微调, 太小容易503
-WORKERS = 6                    # 线程池大小，可根据实际情况调整
+WORKERS = 6                     # 线程池大小，可根据实际情况调整
 
 # 文件保存路径
-SAVE_DIR = "G:/exps/butian"
+SAVE_DIR = "G:/Exps/BuTian/share"
 
 # -------------------- 全局锁 / 会话 --------------------
 print_lock = threading.Lock()
