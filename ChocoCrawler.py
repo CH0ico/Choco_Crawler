@@ -27,12 +27,12 @@ ARTICLE_URL_TEMPLATE = f"{BASE_URL}/article/{{}}"
 
 # 爬取配置(id范围)
 START_ID = 1
-END_ID = 5
-CREATE_DRIVER_COOLDOWN = 4      # 创建浏览器实例的时间间隔，可自行微调, 太小容易503
-WORKERS = 1                    # 线程池大小，可根据实际情况调整
+END_ID = 750
+CREATE_DRIVER_COOLDOWN = 6      # 创建浏览器实例的时间间隔，可自行微调, 太小容易503
+WORKERS = 6                    # 线程池大小，可根据实际情况调整
 
 # 文件保存路径
-SAVE_DIR = "G:/exps/butian2"
+SAVE_DIR = "G:/exps/butian"
 
 # -------------------- 全局锁 / 会话 --------------------
 print_lock = threading.Lock()
