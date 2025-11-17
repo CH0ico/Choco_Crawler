@@ -20,6 +20,20 @@ from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
 import markdownify
 
+# -------------------- 配置全局变量 --------------------
+# 网站配置
+BASE_URL = "https://forum.butian.net"
+ARTICLE_URL_TEMPLATE = f"{BASE_URL}/article/{{}}"
+
+# 爬取配置(id范围)
+START_ID = 1
+END_ID = 5
+CREATE_DRIVER_COOLDOWN = 4      # 创建浏览器实例的时间间隔，可自行微调, 太小容易503
+WORKERS = 1                    # 线程池大小，可根据实际情况调整
+
+# 文件保存路径
+SAVE_DIR = "G:/exps/butian2"
+
 # -------------------- 全局锁 / 会话 --------------------
 print_lock = threading.Lock()
 file_lock  = threading.Lock()
@@ -32,12 +46,12 @@ sess.mount("https://", HTTPAdapter(max_retries=retries))
 # -------------------- 线程局部存储：每个线程独享一个 driver
 thread_local = threading.local()
 
-CREATE_DRIVER_COOLDOWN = 4      # 秒，可自行微调
+
 
 def get_driver():
     """返回当前线程的独立浏览器实例（带创建冷却）"""
     if not hasattr(thread_local, "driver"):
-        driver_path = r"G:\SecTools\Crawler\chromedriver\chromedriver.exe"
+        driver_path = r"G:\\SecTools\\Crawler\\chromedriver\\chromedriver.exe"
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--ignore-certificate-errors")
         # 如要无头，再加 chrome_options.add_argument("--headless=new")
@@ -59,7 +73,7 @@ def crawl_one(i: int) -> str:
     """单篇文章抓取"""
     try:
         id_ = str(i)
-        url = f"https://xz.aliyun.com/news/{id_}"
+        url = ARTICLE_URL_TEMPLATE.format(id_)
 
         # 1. 先拿到 driver（已内置冷却）
         driver = get_driver()
@@ -71,9 +85,9 @@ def crawl_one(i: int) -> str:
             print(url)
         driver.get(url)
         headers = {
-            "Referer": "https://xz.aliyun.com/",
+            "Referer": BASE_URL + "/",
             # 下面 Cookie 请换成自己有效 Cookie，太长已折叠
-            "Cookie": "customer_timezone=8; arms_uid=de74db3f-a544-4abf-9709-11b8479fbca4; ..."
+            # "Cookie": "customer_timezone=8; arms_uid=de74db3f-a544-4abf-9709-11b8479fbca4; ..."
         }
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
@@ -90,9 +104,9 @@ def crawl_one(i: int) -> str:
 
         # 2. 文件名、目录
         f_name = filename_filter(title_text)
-        md_path = f"G:/exps/xianzhi/{id_}-{f_name}.md"
+        md_path = f"{SAVE_DIR}/{id_}-{f_name}.md"
         with file_lock:
-            os.makedirs("G:/exps/xianzhi/images", exist_ok=True)
+            os.makedirs(f"{SAVE_DIR}/images", exist_ok=True)
 
         # 3. 找正文容器
         article_content = None
@@ -117,10 +131,10 @@ def crawl_one(i: int) -> str:
                 if not img_url:
                     continue
                 if not img_url.startswith(("http://", "https://")):
-                    img_url = "https://xz.aliyun.com" + img_url
+                    img_url = BASE_URL + img_url
                 img_name = f"{id_}_{os.path.basename(img_url)}"
                 img_data = sess.get(img_url, headers=headers, timeout=10).content
-                with open(f"G:/exps/xianzhi/images/{img_name}", "wb") as f_img:
+                with open(f"{SAVE_DIR}/images/{img_name}", "wb") as f_img:
                     f_img.write(img_data)
             except Exception as img_e:
                 with print_lock:
@@ -134,7 +148,7 @@ def crawl_one(i: int) -> str:
                 if not img_url:
                     continue
                 if not img_url.startswith(("http://", "https://")):
-                    img_url = "https://xz.aliyun.com" + img_url
+                    img_url = BASE_URL + img_url
                 new_name = f"{id_}_{os.path.basename(img_url)}"
                 md_content = md_content.replace(img_url, f"images/{new_name}")
             except Exception as img_e:
@@ -156,9 +170,9 @@ def crawl_one(i: int) -> str:
 # -------------------- 主入口 --------------------
 if __name__ == "__main__":
     try:
-        workers = 8
+        workers = WORKERS
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [pool.submit(crawl_one, i) for i in range(18000, 19500)]
+            futures = [pool.submit(crawl_one, i) for i in range(START_ID, END_ID)]
             for fu in as_completed(futures):
                 with print_lock:
                     print(fu.result())
