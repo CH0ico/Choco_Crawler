@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-先知道（xz.aliyun.com）文章批量爬 → Markdown + 本地图片
-并发加速版（线程池 + 每线程独立driver），可 Ctrl-C 安全退出
-"""
-
 import os
 import time
 import random
@@ -21,23 +16,25 @@ from bs4 import BeautifulSoup
 import markdownify
 
 # -------------------- 配置全局变量 --------------------
+# 文件保存路径
+SAVE_DIR = "G:/Exps/BuTian/share"
+
+# 浏览器驱动路径
+DRIVER_PATH = r"G:\\SecTools\\Crawler\\chromedriver\\chromedriver.exe"
+
 # 网站配置
 BASE_URL = "https://forum.butian.net"
 
 # 文章URL模板（注意：id 是字符串） 
-# butian.net/share
-# butian.net/article
-# xz.aliyun.com/news
+# butian.net/share butian.net/article xz.aliyun.com/news
 ARTICLE_URL_TEMPLATE = f"{BASE_URL}/share/{{}}" 
 
 # 爬取配置(id范围)
-START_ID = 501
-END_ID = 4648
-CREATE_DRIVER_COOLDOWN = 6      # 创建浏览器实例的时间间隔，可自行微调, 太小容易503
-WORKERS = 6                     # 线程池大小，可根据实际情况调整
+START_ID = 1                  # 由于qax有一些安全配置 start在脚本中建议比预计的小的地方开始爬 防止进入浏览器检查而遗漏, 如从 -{WORKERS  } 开始
+END_ID = 1000 # 4650
+CREATE_DRIVER_COOLDOWN = 3    # 创建浏览器实例的时间间隔，可自行微调, 太小容易503
+WORKERS = 6                  # 线程池大小，可根据实际情况调整
 
-# 文件保存路径
-SAVE_DIR = "G:/Exps/BuTian/share"
 
 # -------------------- 全局锁 / 会话 --------------------
 print_lock = threading.Lock()
@@ -56,7 +53,7 @@ thread_local = threading.local()
 def get_driver():
     """返回当前线程的独立浏览器实例（带创建冷却）"""
     if not hasattr(thread_local, "driver"):
-        driver_path = r"G:\\SecTools\\Crawler\\chromedriver\\chromedriver.exe"
+        driver_path = DRIVER_PATH
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--ignore-certificate-errors")
         # 如要无头，再加 chrome_options.add_argument("--headless=new")
@@ -135,7 +132,12 @@ def crawl_one(i: int) -> str:
                 img_url = img.get("src", "").strip()
                 if not img_url:
                     continue
+                # 更健壮的URL处理
                 if not img_url.startswith(("http://", "https://")):
+                    # 如果URL没有协议前缀，直接添加BASE_URL
+                    # 不管URL是否已经包含主机名，都使用BASE_URL作为基础
+                    if not img_url.startswith("/"):
+                        img_url = "/" + img_url
                     img_url = BASE_URL + img_url
                 img_name = f"{id_}_{os.path.basename(img_url)}"
                 img_data = sess.get(img_url, headers=headers, timeout=10).content
@@ -149,10 +151,15 @@ def crawl_one(i: int) -> str:
         md_content = markdownify.markdownify(str(article_content), heading_style="ATX")
         for img in img_tags:
             try:
-                img_url = img.get("src", "")
+                img_url = img.get("src", "").strip()
                 if not img_url:
                     continue
+                # 更健壮的URL处理
                 if not img_url.startswith(("http://", "https://")):
+                    # 如果URL没有协议前缀，直接添加BASE_URL
+                    # 不管URL是否已经包含主机名，都使用BASE_URL作为基础
+                    if not img_url.startswith("/"):
+                        img_url = "/" + img_url
                     img_url = BASE_URL + img_url
                 new_name = f"{id_}_{os.path.basename(img_url)}"
                 md_content = md_content.replace(img_url, f"images/{new_name}")

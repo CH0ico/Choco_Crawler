@@ -22,8 +22,8 @@ def main():
     deleted_count = 0
     
     for md_file in md_files:
-        # 检查文件名是否包含"404 Not Found"
-        if "404 Not Found" in os.path.basename(md_file):
+        # 检查文件名是否包含"404 Not Found"或"-访问验证"
+        if "404 Not Found" in os.path.basename(md_file) or "访问验证" in os.path.basename(md_file):
             try:
                 os.remove(md_file)
                 print(f"已删除: {os.path.basename(md_file)}")
