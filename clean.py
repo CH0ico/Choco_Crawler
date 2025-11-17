@@ -22,7 +22,7 @@ XIANZHI_DIR = 'G:/exps/xianzhi'  # 先知社区文件目录（使用正斜杠避
 # 修改后的正则表达式，以匹配用户提供的实际格式
 HEAD_RE = re.compile(r'来源: https://xz\.aliyun\.com/news/\d+[\s\S]*?\d+浏览[\s\S]*?发表于[\s\S]*?\d+浏览.*?\n', re.DOTALL)
 # 更宽松的尾部匹配
-FOOT_RE = re.compile(r'\[\d* 人收藏\][\s\S]*', re.DOTALL)
+FOOT_RE = re.compile(r'\[\d*人收藏\][\s\S]*', re.DOTALL)
 
 def clean_file(path):
     with open(path, encoding='utf-8') as f:
@@ -85,7 +85,98 @@ def delete_specific_files():
                 print(f'[+] deleted -> {file_path}')
             except Exception as e:
                 print(f'[-] failed to delete {file_path}: {e}')
+
+        # 删除 *_icon-search.png 文件
+        icon_files = glob.glob(os.path.join(images_dir, '*_icon-search.png'))
+        print(f"[+] 找到 {len(icon_files)} 个 icon 图片文件")
+        for file_path in icon_files:
+            try:
+                os.remove(file_path)
+                print(f'[+] deleted -> {file_path}')
+            except Exception as e:
+                print(f'[-] failed to delete {file_path}: {e}')
+
+        # 删除 *_share.png 文件
+        share_files = glob.glob(os.path.join(images_dir, '*_share.png'))
+        print(f"[+] 找到 {len(share_files)} 个 share 图片文件")
+        for file_path in share_files:
+            try:
+                os.remove(file_path)
+                print(f'[+] deleted -> {file_path}')
+            except Exception as e:
+                print(f'[-] failed to delete {file_path}: {e}')
+
+        # 删除 *_close.png 文件
+        close_files = glob.glob(os.path.join(images_dir, '*_close.png'))
+        print(f"[+] 找到 {len(close_files)} 个 close 图片文件")
+        for file_path in close_files:
+            try:
+                os.remove(file_path)
+                print(f'[+] deleted -> {file_path}')
+            except Exception as e:
+                print(f'[-] failed to delete {file_path}: {e}')
+
+        # 删除 *_forward.png 文件
+        forward_files = glob.glob(os.path.join(images_dir, '*_forward.png'))
+        print(f"[+] 找到 {len(forward_files)} 个 forward 图片文件")
+        for file_path in forward_files:
+            try:
+                os.remove(file_path)
+                print(f'[+] deleted -> {file_path}')
+            except Exception as e:
+                print(f'[-] failed to delete {file_path}: {e}')
+
+        # 删除 *_icon-publish.png 文件
+        icon_publish_files = glob.glob(os.path.join(images_dir, '*_icon-publish.png'))
+        print(f"[+] 找到 {len(icon_publish_files)} 个 icon-publish 图片文件")
+        for file_path in icon_publish_files:
+            try:
+                os.remove(file_path)
+                print(f'[+] deleted -> {file_path}')
+            except Exception as e:
+                print(f'[-] failed to delete {file_path}: {e}')
+
+        # 删除 *_pic_default_content.png 文件
+        pic_default_content_files = glob.glob(os.path.join(images_dir, '*_pic_default_content.png'))
+        print(f"[+] 找到 {len(pic_default_content_files)} 个 pic_default_content 图片文件")
+        for file_path in pic_default_content_files:
+            try:
+                os.remove(file_path)
+                print(f'[+] deleted -> {file_path}')
+            except Exception as e:
+                print(f'[-] failed to delete {file_path}: {e}')
+
+        # 删除 *_xlsx 文件
+        xlsx_files = glob.glob(os.path.join(images_dir, '*.xlsx'))
+        print(f"[+] 找到 {len(xlsx_files)} 个 xlsx 文件")
+        for file_path in xlsx_files:
+            try:
+                os.remove(file_path)
+                print(f'[+] deleted -> {file_path}')
+            except Exception as e:
+                print(f'[-] failed to delete {file_path}: {e}')
+
+        # 删除 *_resize,w_50 文件
+        resize_files = glob.glob(os.path.join(images_dir, '*_resize,w_50'))
+        print(f"[+] 找到 {len(resize_files)} 个 resize 文件")
+        for file_path in resize_files:
+            try:
+                os.remove(file_path)
+                print(f'[+] deleted -> {file_path}')
+            except Exception as e:
+                print(f'[-] failed to delete {file_path}: {e}')
+
         
+        # 删除 *_7e6f6165-ee99-3f16-8091-d257a52b0dd9 文件
+        xzlogo = glob.glob(os.path.join(images_dir, '*_7e6f6165-ee99-3f16-8091-d257a52b0dd9'))
+        print(f"[+] 找到 {len(xzlogo)} 个 public 文件")
+        for file_path in xzlogo:
+            try:
+                os.remove(file_path)
+                print(f'[+] deleted -> {file_path}')
+            except Exception as e:
+                print(f'[-] failed to delete {file_path}: {e}')
+
         # 删除 *_public 文件
         public_files = glob.glob(os.path.join(images_dir, '*_public'))
         print(f"[+] 找到 {len(public_files)} 个 public 文件")

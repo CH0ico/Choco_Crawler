@@ -14,7 +14,7 @@ import os
 
 # 头尾正则（re.DOTALL 让 . 匹配换行）
 HEAD_RE = re.compile(r'来源: https://xz\.aliyun\.com/news/\d+[\s\S]*?\d+浏览 · \d{4}-\d{2}-\d{2} \d{2}:\d{2}\n')
-FOOT_RE = re.compile(r'\[0 人收藏\][\s\S]*', re.MULTILINE)
+FOOT_RE = re.compile(r'\[\s*\d+\s*人(?:收藏|喜欢)\]\s*(?:\([^)]*\))?[\s\S]*', re.DOTALL)
 
 def clean_file(path):
     with open(path, encoding='utf-8') as f:

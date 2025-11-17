@@ -158,7 +158,7 @@ if __name__ == "__main__":
     try:
         workers = 8
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [pool.submit(crawl_one, i) for i in range(10404, 15000)]
+            futures = [pool.submit(crawl_one, i) for i in range(18000, 19500)]
             for fu in as_completed(futures):
                 with print_lock:
                     print(fu.result())
